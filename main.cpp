@@ -72,6 +72,12 @@ void loadSettings() {
     if(ledLevel == 0) {
         ledLevel = MAX_LED_LEVEL;
     }
+
+    if(ledLevel == MAX_LED_LEVEL) {
+        buttonDirection = -1;
+    } else {
+        buttonDirection = 1;
+    }
 }
 
 void saveSettings() {
@@ -156,6 +162,7 @@ void loop() {
         } else if(buttonPressed) {
             buttonDirection = -buttonDirection;
             buttonPressed = false;
+            saveSettings();
         }
     }
     
