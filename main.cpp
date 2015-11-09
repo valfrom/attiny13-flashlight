@@ -12,19 +12,19 @@
 #define BODSE 2                  //BOD Sleep enable bit in MCUCR
 
 #define MAX_LED_LEVEL 255
-#define MIN_LED_LEVEL 200
+#define MIN_LED_LEVEL 10
+#define REGULATOR_DELAY 1
+#define STEP 1
 
-#define TURN_LED_ON() PORTB |= (1<<LED)
-#define TURN_LED_OFF() PORTB &= ~(1<<LED);
+#define TURN_LED_OFF() PORTB |= (1<<LED)
+#define TURN_LED_ON() PORTB &= ~(1<<LED);
 
 #define IS_BUTTON_ON() !(PINB & (1<<BUTTON))
 
 #define BLINK() TURN_LED_OFF();_delay_ms(100);TURN_LED_ON();_delay_ms(5);TURN_LED_OFF();
 
-#define REGULATOR_DELAY 100
 
-
-uint8_t volatile ledLevel = 0;
+int volatile ledLevel = 0;
 uint8_t volatile interrupt = false;
 uint8_t volatile turnedOff = false;
 
@@ -34,7 +34,7 @@ uint8_t ignoreInterrupt = false;
 uint16_t tick = 0;
 
 
-void setLedLevel(uint8_t level);
+void setLedLevel(int level);
 void powerOff();
 void powerOn();
 void saveSettings();
@@ -110,6 +110,36 @@ void setup() {
     powerOff();
 }
 
+void input() {
+    if(tick % REGULATOR_DELAY == 0) {
+        if(IS_BUTTON_ON()) {
+            if(buttonDirection > 0) {
+                if(ledLevel < MAX_LED_LEVEL) {
+                    ledLevel += STEP;
+                    if(ledLevel >= MAX_LED_LEVEL) {
+                        ledLevel = MAX_LED_LEVEL;
+                        BLINK();
+                    }
+                }
+            } else {
+                if(ledLevel > MIN_LED_LEVEL) {
+                    ledLevel -= STEP;
+                    if(ledLevel <= MIN_LED_LEVEL) {
+                        ledLevel = MIN_LED_LEVEL;
+                        BLINK();
+                    }
+                }
+            }
+
+            buttonPressed = true;
+        } else if(buttonPressed) {
+            buttonDirection = -buttonDirection;
+            buttonPressed = false;
+            saveSettings();
+        }
+    }
+}
+
 void loop() {
     if(interrupt) {
         if(!ignoreInterrupt) {
@@ -140,42 +170,26 @@ void loop() {
         return;
     }
 
-    if(tick % REGULATOR_DELAY == 0) {
-        if(IS_BUTTON_ON()) {
-            if(buttonDirection > 0) {
-                if(ledLevel < MAX_LED_LEVEL) {
-                    ledLevel += 1;
-                    if(ledLevel == MAX_LED_LEVEL) {
-                        BLINK();
-                    }
-                }
-            } else {
-                if(ledLevel > MIN_LED_LEVEL) {
-                    ledLevel -= 1;
-                    if(ledLevel == MIN_LED_LEVEL) {
-                        BLINK();
-                    }
-                }
-            }
+    input();
 
-            buttonPressed = true;
-        } else if(buttonPressed) {
-            buttonDirection = -buttonDirection;
-            buttonPressed = false;
-            saveSettings();
-        }
+    if(ledLevel == 0) {
+        TURN_LED_OFF();
+        _delay_us(1);
+        tick ++;
+        return;
     }
-    
-    TURN_LED_ON();
-    _delay_us(1);    
-    tick ++;
-    TURN_LED_OFF();
-    for(int i = 0; i < MAX_LED_LEVEL - ledLevel; i++) {
+
+    uint8_t p = MAX_LED_LEVEL / ledLevel;
+
+    for(uint8_t i=0;i<MAX_LED_LEVEL;i++) {
+        if(i%p == 0) {
+            TURN_LED_ON();
+        } else {
+            TURN_LED_OFF();
+        }
         _delay_us(1);
         tick ++;
     }
-    _delay_us(1);
-    tick ++;
 }
 
 int main(void) {
